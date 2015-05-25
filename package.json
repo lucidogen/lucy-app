@@ -1,0 +1,32 @@
+{
+  "name": "lucy-loader",
+  "version": "0.1.0",
+  "description": "A small library for live coding (hook trigger on file change).",
+  "main": "index.js",
+  "scripts": {
+    "test": "make test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/lucidogen/loader.git"
+  },
+  "keywords": [
+    "live coding",
+    "require",
+    "live"
+  ],
+  "author": "Gaspard Bucher <gaspard@lucidogen.io> (http://lucidogen.io/)",
+  "licenses": [
+    {
+      "type": "commercial",
+      "url": "http://lucidity.io/license"
+    }
+  ],  
+  "bugs": {
+    "url": "https://github.com/lucidogen/loader/issues"
+  },
+  "devDependencies": {
+    "mocha": "~1.16.2",
+    "chai": "~1.8.1"
+  }
+}
