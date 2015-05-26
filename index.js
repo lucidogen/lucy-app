@@ -21,8 +21,16 @@
     // Start listening for changes in '.'
     live.watch('.')
 */
+'use strict'
+const caller = require('caller')
+const path   = require('path')
 
 const lib = {}
+
+/////////////////////////////// Private
+const ONCE_CACHE = {}
+
+/////////////////////////////// Public
 
 /* Async load local code and trigger `callback` every time the file changes. The
  * `path` parameter must be local to the current file (no absolute path support).
@@ -44,6 +52,20 @@ lib.path = function(path, callback) {
  * calling script).
  */
 lib.watch = function(directory) {
+}
+
+/* Execute the code in the callback only once and return the same value on any
+ * subsequent call.
+ */
+lib.once = function(callback) {
+  const path = caller()
+  // const path = path.resolve(caller())
+  let value = ONCE_CACHE[path + postfix]
+  if (value == undefined) {
+    value = callback()
+    ONCE_CACHE[path + postfix] = value
+  }
+  return value
 }
 
 module.exports = lib
