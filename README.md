@@ -1,23 +1,33 @@
-Lucy Loader
-===========
+# Lucy Live
 
-A small library for live coding (hook trigger on file change).
+## Live coding support for nodejs
+
+lucy.live helps live coding with Javascript by watching files for changes and
+providing a mechanism to trigger hooks when needed.
+
+Usage example:
+
+```js
+  const live = require('lucy-live')
+
+  // expects foo.js library to return "obj"
+  live.load('foo.js', function(obj) {
+    console.log('foo changed: ' + obj)
+  }
+
+  live.path('image.jpg', function(p) {
+    // do something with new image taking
+    // care of Browser cache
+  })
+
+  // Start listening for changes in '.'
+  live.watch('.')
+```
 
 ## Installation
 
 ```shell
-  npm install lucy-loader --save
-```
-
-## Usage
-
-```js
-  const load   = require('lucy-loader').load
-
-  // expects foo.js library to return "obj"
-  load('foo.js', function(obj) {
-    console.log('foo changed: ' + obj)
-  }
+  npm install lucy-live --save
 ```
 
 ## Tests

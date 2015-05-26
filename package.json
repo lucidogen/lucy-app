@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/lucidogen/loader.git"
+    "url": "git://github.com/lucidogen/lucy-loader.git"
   },
   "keywords": [
     "live coding",
