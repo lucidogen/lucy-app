@@ -30,41 +30,87 @@ const vm     = require('vm')
 const lib = {}
 
 /////////////////////////////// Private
-const ONCE_CACHE = {}
+let ONCE_CACHE = {}
 
 // Contains the callbacks to trigger on path change.
-const LOAD_PATHS = {}
+let LOAD_PATHS = {}
 
 // Hooks by callpath
-const ORIGIN_HAS_CALLBACKS = {}
+let ORIGIN_HAS_CALLBACKS = {}
 
+// Watched paths
+let WATCHED_PATHS = {}
+
+const getData = function(h, force) {
+  let data = h.data
+  if (!data || force) {
+    h.error = null
+    data = new Promise(function(resolve, reject) {
+      fs.readFile(h.path, {encoding:'utf8'}, function(err, buf) {
+        if (err) {
+          console.log(err.toString())
+          h.error = err
+          reject(err)
+        } else {
+          // console.log(`Reading '${h.path}'...`)
+          resolve(buf)
+        }
+      })
+    })
+    h.data = data
+  }
+  return data
+}
+
+// If we change 'onChangedPath' to not read file content to detect file changes,
+// we need to change the HANDLERS to use getData and adapt cache code
+// accordingly.
+const onChangedPath = function(h, callback) {
+  getData(h, true).then(function(data) {
+    if (h.readValue == data) {
+      // same. ignore
+    } else {
+      h.evalValue = null
+      h.readValue = data
+      callback(h)
+    }
+  })
+}
 
 // Reloading code
-// FIXME: Only use these handlers for eval. Set in the callback, what to do.
-//   * live.load: read file content
-//   * live.eval: evaluate file content (handlers used here: babel, ocaml, etc)
-//   * live.path: just return full path
-let HANDLERS =
- { js: function(data, h) {
-    // Transform ES6 to ES5 (not yet)
-    // data = babel.transform(data)
-    return evalCode(data, h)
-   }
- , frag: function(data, h) { return data }
- , vert: function(data, h) { return data }
- , txt:  function(data, h) { return data }
-} 
+const HANDLERS =
+  { read: function(h, clbk) { clbk(h.readValue) }
+  , path: function(h, clbk) { clbk(h.path) }
+  , eval:
+    { js: function(h, clbk) {
+        if (h.evalValue) {
+          clbk(h.evalValue)
+        } else {
+          let v = evalCode(h, h.readValue)
+          if (h.error) {
+            console.log(h.error.toString())
+          } else {
+            h.evalValue = v
+            clbk(v)
+          }
+        }
+      }
+    } 
+  }
+
+const emptyClbk = function() {}
 
 // This is set to the currently evaled (reloaded) path to clear callbacks
 // accordingly on reload (see below)
 let CALLBACK_ORIGIN
 
-const evalCode = function(code, h) {
+const evalCode = function(h, code) {
 
-  // Clear all previously defined callbacks
+  // Clear callbakcs previously defined through eval (we do not want to
+  // trigger callbacks in dead code).
   if (ORIGIN_HAS_CALLBACKS[h.path]) {
     for(let p in LOAD_PATHS) {
-      let callbacks = p.callbacks
+      let callbacks = LOAD_PATHS[p].callbacks
       for(let i = callbacks.length-1; i >= 0 ; --i) {
         let callback = callbacks[i]
         if (callback.origin == h.path) {
@@ -78,8 +124,21 @@ const evalCode = function(code, h) {
   // No more callbacks linked to this origin
   ORIGIN_HAS_CALLBACKS[h.path] = null
   
+  h.error = null
+
   CALLBACK_ORIGIN = h.path
-    let rval = vm.runInThisContext(data, {filename: h.path})
+    let rval
+    try {
+      // TODO: Why can't we just create a new blank state keeping global scope
+      // AS-IS ?
+      rval = vm.runInNewContext("'use strict';\n"+code,
+        { require:require
+        , global:global
+        , console:console
+        }, {filename: h.path})
+    } catch(err) {
+      h.error = err
+    }
   CALLBACK_ORIGIN = null
 
   return rval
@@ -93,37 +152,39 @@ const getType = function(p) {
   return lpath.extname(p).substr(1)
 }  
 
-const emptyClbk = function() {}
-
 const reload = function(h) {
-  let p = h.path
-  // async load...
-  // console.log("Reloading path = '"+h.path+"'")
-  if (h.handler) {
-    fs.readFile(h.path, {encoding:'utf8'}, function(err, data) {
-      if (err) throw err
-      // do nothing on same content
-      // TODO: use hash value to avoid storing full source/data.
-      if (data == h.data) {
-        //console.log('=== SAME DATA ===')
-      } else {
-        //console.log('=== LOADING CODE ===')
-        h.data = data
-        data = h.handler(data, h)
-        let callbacks = h.callbacks
-        for (let i = 0; i < callbacks.length; ++i) { 
-          callbacks[i].callback(data)
-        }
-      }
-
-    })
-  } else {
-    let callbacks = h.callbacks
-    for (let i = 0; i < callbacks.length; ++i) { 
-      callbacks[i].callback(h.path)
-    }
+  let callbacks = h.callbacks
+  for(let i = callbacks.length-1; i >= 0 ; --i) {
+    let clbk = callbacks[i]
+    clbk.handler(h, clbk.callback)
   }
 }
+
+const setupCallback = function(path, callback, handler) {
+  let clbk =
+    { origin:   CALLBACK_ORIGIN
+    , callback: callback
+    , handler:  handler
+    }
+
+  if (CALLBACK_ORIGIN) {
+    ORIGIN_HAS_CALLBACKS[CALLBACK_ORIGIN] = true
+  }
+
+  let h = LOAD_PATHS[path]
+  if (!h) {
+    h = { callbacks: [clbk]
+        , path: path
+        }
+
+    LOAD_PATHS[path] = h
+    onChangedPath(h, reload)
+  } else {
+    h.callbacks.push(clbk)
+    clbk.handler(h, clbk.callback)
+  }
+}
+
 
 // FIXME: How do we avoid triggering callbacks for old versions of the script ?
 //
@@ -146,63 +207,74 @@ const reload = function(h) {
 
 /////////////////////////////// Public
 
-/* Async load local code and trigger `callback` every time the file changes. The
- * `path` parameter must be local to the current file (no absolute path support).
- * 
- * If `path` points to a javascript file, the file is evaluated and the result
- * is passed as argument to the callback.
+/* Async read file content at local `path` and trigger `callback` every time the
+ * file changes.
  */
-lib.load = function(path, callback) {
+lib.read = function(path, callback) {
+  let base = lpath.dirname(makePath(caller()))
+  path = lpath.resolve(lpath.join(base, path))
+  setupCallback(path, callback, HANDLERS.read)
+}
+
+/* Async eval code file located at local `path` and trigger `callback` every
+ * time the file changes.
+ * 
+ * The result of the code execution is passed as argument to the callback.
+ */
+lib.eval = function(path, callback) {
+  let base = lpath.dirname(makePath(caller()))
+  path = lpath.resolve(lpath.join(base, path))
+  let type = getType(path)
+  let h = HANDLERS.eval[type]
+  console.assert(h, `Missing handler to evaluate ${type} code`)
+  setupCallback(path, callback, h)
+}
+
+/* Watch for changes to local `path` and trigger `callback` every time the file
+ * changes.
+ *
+ * The fullpath of the file is passed as callback parameter.
+ */
+lib.path = function(path, callback) {
+  let base = lpath.dirname(makePath(caller()))
+  path = lpath.resolve(lpath.join(base, path))
+  setupCallback(path, callback, HANDLERS.path)
+}
+
+/* Clear all previously defined watches and callbacks.
+ */
+lib.clear = function() {
+  for(let k in WATCHED_PATHS) {
+    let watcher = WATCHED_PATHS[k]
+    watcher.close()
+  }
+  ONCE_CACHE           = {}
+  LOAD_PATHS           = {}
+  ORIGIN_HAS_CALLBACKS = {}
+  WATCHED_PATHS        = {}
+}
+
+/* Start listening for file changes in a given `path` (relative to the
+ * calling script).
+ */
+lib.watch = function(path) {
   let base = lpath.dirname(makePath(caller()))
   path = lpath.resolve(lpath.join(base, path))
 
-  callback = callback || emptyClbk
-
-  callback =
-    { origin:   CALLBACK_ORIGIN
-    , callback: callback
-      // value to send in the callback
-    , type:     'load'
-    }
-
-  if (CALLBACK_ORIGIN) {
-    ORIGIN_HAS_CALLBACKS[CALLBACK_ORIGIN] = true
-  }
-
-  let h = LOAD_PATHS[path]
-  if (!h) {
-    let t = getType(path)
-    // FIXME: handler does not belong here. It should be linked to individual
-    // callbacks because of live.eval, live.path and live.load.
-    let handler = HANDLERS[t]
-
-    h = { callbacks: [callback]
-        , type: t
-        , path: path
-        , handler: handler
-        }
-
-    LOAD_PATHS[path] = h
-    reload(h)
+  if (WATCHED_PATHS[path]) {
+    // nothing to do
   } else {
-    h.callbacks.push(callback)
-    callback.callback(h.value)
+    let watcher = fs.watch(path, {persistent:true, recursive:true}, function (event, filename) {
+      let p = lpath.resolve(lpath.join(path, filename))
+      let h = LOAD_PATHS[p]
+      if (!h) {
+        // console.log('unknown changed file "'+p+'"')
+      } else {
+        onChangedPath(h, reload)
+      }
+    })
+    WATCHED_PATHS[path] = watcher
   }
-}
-
-/* Watch for a file change but do not read the content. The `path` parameter 
- * must be local to the calling script. When the target file changes, the
- * `callback` is called with the absolute version of path as parameter.
- */
-lib.path = function(path, callback) {
-}
-
-/* Start listening for file changes in a given `directory` (relative to the
- * calling script).
- */
-lib.watch = function(directory) {
-
-  // If
 }
 
 /* Execute the code in the callback only once and return the same value on any

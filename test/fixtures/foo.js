@@ -1,0 +1,1 @@
+`Value: ${Math.random()}`
