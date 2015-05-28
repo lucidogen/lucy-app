@@ -129,23 +129,19 @@ const evalCode = function(h, code) {
   CALLBACK_ORIGIN = h.path
     let rval
     try {
-      // TODO: Why can't we just create a new blank state keeping global scope
-      // AS-IS ?
-      rval = vm.runInNewContext("'use strict';\n"+code,
+      rval = vm.runInNewContext(code,
         { require:require
         , global:global
         , console:console
+        , module:h.self
         }, {filename: h.path})
+      rval = h.self.exports
     } catch(err) {
       h.error = err
     }
   CALLBACK_ORIGIN = null
 
   return rval
-}
-
-const makePath = function(caller_p) {
-  return caller_p.substr(caller_p.indexOf(':') + 1)
 }
 
 const getType = function(p) {
@@ -175,6 +171,8 @@ const setupCallback = function(path, callback, handler) {
   if (!h) {
     h = { callbacks: [clbk]
         , path: path
+          // this is used during eval to emulate require
+        , self: {}
         }
 
     LOAD_PATHS[path] = h
@@ -185,6 +183,101 @@ const setupCallback = function(path, callback, handler) {
   }
 }
 
+const statPath = function(path) {
+  try {
+    return fs.statSync(path)
+  } catch (ex) {}
+  return false
+}
+
+const pathCache = {}
+
+const tryFile = function(path) {
+  var stats = statPath(path)
+  if (stats && !stats.isDirectory()) {
+    return fs.realpathSync(path, pathCache)
+  }
+  return false
+}
+
+const tryExtensions = function(path, exts) {
+  for(let i = 0, len = exts.length; i < len; ++i) {
+    let filename = tryFile(path + '.' + exts[i])
+    if (filename) return filename
+  }
+  return false
+}
+
+const findPath = function(request, paths) {
+  let exts = Object.keys(HANDLERS.eval)
+
+  if (request.charAt(0) === '/') {
+    paths = ['']
+  }
+
+  let trailingSlash = (request.slice(-1) === '/')
+
+  for (let i = 0, len = paths.length; i < len; ++i) {
+    let basePath = lpath.resolve(paths[i], request)
+    let filename
+
+    if (!trailingSlash) {
+      // simplest case: path + filename
+      filename = tryFile(basePath)
+
+      if (!filename && !trailingSlash) {
+        // try all extensions for which we have a handler
+        filename = tryExtensions(basePath, exts);
+      }
+    }
+
+    // We do not support loading packages (yet)
+    // if (!filename) {
+    //   filename = tryPackage(basePath, exts);
+    // }
+
+    if (!filename) {
+      // try to load 'index' file
+      filename = tryExtensions(lpath.resolve(basePath, 'index'), exts)
+    }
+
+    if (filename) return filename
+  }
+  return false
+}
+
+const resolvePath = function(path, caller_p) {
+  let filename
+  let start = path.substr(0, 2)
+  if (path.charAt(0) === '/') {
+    // absolute path
+    filename = path
+  } else if (start == './' || start == '..') {
+    let base = lpath.dirname(caller_p.substr(caller_p.indexOf(':') + 1))
+    filename = lpath.resolve(base, path)
+  } else {
+    // funky node_modules path not supported
+    throw new Error(`Cannot watch path '${path}' (not a relative or absolute path)`)
+  }    
+  return filename
+}
+
+const resolveFilename = function(path, caller_p) {
+  let start = path.substr(0, 2)
+  let paths
+  if (start != './' && start != '..') {
+    // absolute or funky node_modules require
+    paths = module.paths
+  } else {
+    let base = lpath.dirname(caller_p.substr(caller_p.indexOf(':') + 1))
+    paths = [base]
+  }
+  let filename = findPath(path, paths)
+  if (!filename) {
+    throw new Error(`Cannot find path '${path}'`)
+  }
+  return filename
+}
 
 // FIXME: How do we avoid triggering callbacks for old versions of the script ?
 //
@@ -211,27 +304,35 @@ const setupCallback = function(path, callback, handler) {
  * file changes.
  */
 lib.read = function(path, callback) {
-  if (!lpath.isAbsolute(path)) {
-    let base = lpath.dirname(makePath(caller()))
-    path = lpath.resolve(lpath.join(base, path))
-  }
-  setupCallback(path, callback, HANDLERS.read)
+  let filename = resolveFilename(path, caller())
+  setupCallback(filename, callback, HANDLERS.read)
 }
 
-/* Async eval code file located at local `path` and trigger `callback` every
- * time the file changes.
+/* Async require file at `path` and trigger `callback` every time the file
+ * changes. File/module location implementation follows standard `require`
+ * [rules](https://nodejs.org/api/modules.html#modules_all_together).
  * 
- * The result of the code execution is passed as argument to the callback.
+ * The `module.exports` is passed as argument to the callback. During each code
+ * reload operation, the `module` object is maintained and can be used to store
+ * stable state information.
+ *
+ * Compared to Module.require, the 'global' field is not copied as real globals
+ * inside the module's sandbox for performance reasons (with the exception of
+ * `require` and `console`). Therefore, accessing globals must be done through
+ * `global.foo` instead of simply calling `foo`.
+ *
+ * Finally, live.require does not load packages by parsing package.json (yet)
+ * and does not try to find modules in global paths (it makes no sense to live
+ * code module stored globally).
  */
-lib.eval = function(path, callback) {
-  if (!lpath.isAbsolute(path)) {
-    let base = lpath.dirname(makePath(caller()))
-    path = lpath.resolve(lpath.join(base, path))
+lib.require = function(path, callback) {
+  let filename = resolveFilename(path, caller())
+  let type = getType(filename)
+  let handler = HANDLERS.eval[type]
+  if (!handler) {
+    throw new Error(`Missing handler to evaluate ${type} code.`)
   }
-  let type = getType(path)
-  let h = HANDLERS.eval[type]
-  console.assert(h, `Missing handler to evaluate ${type} code`)
-  setupCallback(path, callback, h)
+  setupCallback(filename, callback, handler)
 }
 
 /* Watch for changes to local `path` and trigger `callback` every time the file
@@ -240,11 +341,8 @@ lib.eval = function(path, callback) {
  * The fullpath of the file is passed as callback parameter.
  */
 lib.path = function(path, callback) {
-  if (!lpath.isAbsolute(path)) {
-    let base = lpath.dirname(makePath(caller()))
-    path = lpath.resolve(lpath.join(base, path))
-  }
-  setupCallback(path, callback, HANDLERS.path)
+  let filename = resolveFilename(path, caller())
+  setupCallback(filename, callback, HANDLERS.path)
 }
 
 /* Clear all previously defined watches and callbacks.
@@ -264,14 +362,13 @@ lib.clear = function() {
  * calling script).
  */
 lib.watch = function(path) {
-  let base = lpath.dirname(makePath(caller()))
-  path = lpath.resolve(lpath.join(base, path))
-
-  if (WATCHED_PATHS[path]) {
+  let filename = resolvePath(path, caller())
+  
+  if (WATCHED_PATHS[filename]) {
     // nothing to do
   } else {
-    let watcher = fs.watch(path, {persistent:true, recursive:true}, function (event, filename) {
-      let p = lpath.resolve(lpath.join(path, filename))
+    let watcher = fs.watch(filename, {persistent:true, recursive:true}, function (event, fname) {
+      let p = lpath.resolve(filename, fname)
       let h = LOAD_PATHS[p]
       if (!h) {
         // console.log('unknown changed file "'+p+'"')
@@ -279,7 +376,7 @@ lib.watch = function(path) {
         onChangedPath(h, reload)
       }
     })
-    WATCHED_PATHS[path] = watcher
+    WATCHED_PATHS[filename] = watcher
   }
 }
 
@@ -287,8 +384,9 @@ lib.watch = function(path) {
  * subsequent call.
  */
 lib.once = function(callback) {
-  let path = makePath(caller())
-  // const path = lpath.resolve(caller())
+  let caller_p = caller()
+  let path = lpath.resolve(caller_p.substr(caller_p.indexOf(':') + 1))
+
   let value = ONCE_CACHE[path]
   if (value == undefined) {
     value = callback()

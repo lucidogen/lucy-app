@@ -4,13 +4,13 @@ const path = require('path')
 const fs   = require('fs')
 
 const expect = require('chai').expect
-const live   = require('../live')
+const live   = require('../index')
 
 describe('live', function() {
 
   describe('#read', function() {
     it('should #read file from local path', function(done) {
-      live.read('fixtures/foo.txt', function(txt) {
+      live.read('./fixtures/foo.txt', function(txt) {
         expect(txt).to.equal('Hello Lucy !\n')
         done()
       })
@@ -29,7 +29,7 @@ describe('live', function() {
   describe('#eval', function() {
     let evalValue = null
     it('should evaluate code from local path', function(done) {
-      live.eval('fixtures/foo.js', function(value) {
+      live.require('./fixtures/foo', function(value) {
         expect(value).to.match(/^Value: \d/)
         evalValue = value
         done()
@@ -39,15 +39,31 @@ describe('live', function() {
     it('should #eval from absolute path', function(done) {
       let p = require.resolve('./fixtures/foo.js')
       expect(path.isAbsolute(p)).to.be.true
-      live.eval(p, function(value) {
+      live.require(p, function(value) {
         expect(value).to.match(/^Value: \d/)
         done()
       })
     })
 
     it('should only evaluate code once', function() {
-      live.eval('fixtures/foo.js', function(value) {
+      live.require('./fixtures/foo', function(value) {
         expect(value).to.equal(evalValue)
+      })
+    })
+
+    it('should not export global values', function(done) {
+      var live_foo = 'Set in live_test.js'
+      live.require('./fixtures/foo.js', function(value) {
+        expect(live_foo).to.equal('Set in live_test.js')
+        done()
+      })
+    })
+
+    it('should reload with same module', function(done) {
+      live.require('./fixtures/foo.js', function(value) {
+        expect(value).to.match(/^Value: \d/)
+        evalValue = value
+        done()
       })
     })
   }) // #eval
@@ -92,10 +108,10 @@ describe('live', function() {
       let values = []
       let op = function*() {
         // after first read, we write new content
-        fs.writeFile(p, '"This is barman."')
+        fs.writeFile(p, 'module.exports = "This is barman."')
         yield
         // after second reload, write something else
-        fs.writeFile(p, '"This is barmaid."')
+        fs.writeFile(p, 'module.exports = "This is barmaid."')
         yield
         // last reload, just end test
         expect(values).to.deep.equal(
@@ -107,11 +123,11 @@ describe('live', function() {
         done()
       }()
 
-      live.eval('fixtures/bar.js', function(v) {
+      live.require('./fixtures/bar.js', function(v) {
         values.push(v)
         op.next()
       })
-      live.watch('fixtures')
+      live.watch('./fixtures')
     })
 
     it('should invalidate created callbacks on code reload', function(done) {
@@ -164,12 +180,12 @@ describe('live', function() {
 
       global.live_reload_gen.next()
 
-      live.eval('fixtures/reload.js', function(v) {
+      live.require('./fixtures/reload', function(v) {
         // first trigger on 'reload.js' evaluation
         global.live_reload_gen.next('reload:'+v)
       })
 
-      live.watch('fixtures')
+      live.watch('./fixtures')
 
     })
   }) // #watch
@@ -177,7 +193,7 @@ describe('live', function() {
 
   describe('#path', function() {
     it('should return full path from local path', function() {
-      live.path('fixtures/foo.txt', function(p) {
+      live.path('./fixtures/foo.txt', function(p) {
         expect(p).to.equal(require.resolve('./fixtures/foo.txt'))
       })
     })
