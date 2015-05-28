@@ -211,8 +211,10 @@ const setupCallback = function(path, callback, handler) {
  * file changes.
  */
 lib.read = function(path, callback) {
-  let base = lpath.dirname(makePath(caller()))
-  path = lpath.resolve(lpath.join(base, path))
+  if (!lpath.isAbsolute(path)) {
+    let base = lpath.dirname(makePath(caller()))
+    path = lpath.resolve(lpath.join(base, path))
+  }
   setupCallback(path, callback, HANDLERS.read)
 }
 
@@ -222,8 +224,10 @@ lib.read = function(path, callback) {
  * The result of the code execution is passed as argument to the callback.
  */
 lib.eval = function(path, callback) {
-  let base = lpath.dirname(makePath(caller()))
-  path = lpath.resolve(lpath.join(base, path))
+  if (!lpath.isAbsolute(path)) {
+    let base = lpath.dirname(makePath(caller()))
+    path = lpath.resolve(lpath.join(base, path))
+  }
   let type = getType(path)
   let h = HANDLERS.eval[type]
   console.assert(h, `Missing handler to evaluate ${type} code`)
@@ -236,8 +240,10 @@ lib.eval = function(path, callback) {
  * The fullpath of the file is passed as callback parameter.
  */
 lib.path = function(path, callback) {
-  let base = lpath.dirname(makePath(caller()))
-  path = lpath.resolve(lpath.join(base, path))
+  if (!lpath.isAbsolute(path)) {
+    let base = lpath.dirname(makePath(caller()))
+    path = lpath.resolve(lpath.join(base, path))
+  }
   setupCallback(path, callback, HANDLERS.path)
 }
 

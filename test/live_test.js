@@ -15,6 +15,15 @@ describe('live', function() {
         done()
       })
     })
+
+    it('should #read file from absolute path', function(done) {
+      let p = require.resolve('./fixtures/foo.txt')
+      expect(path.isAbsolute(p)).to.be.true
+      live.read(p, function(txt) {
+        expect(txt).to.equal('Hello Lucy !\n')
+        done()
+      })
+    })
   }) // #read
 
   describe('#eval', function() {
@@ -23,6 +32,15 @@ describe('live', function() {
       live.eval('fixtures/foo.js', function(value) {
         expect(value).to.match(/^Value: \d/)
         evalValue = value
+        done()
+      })
+    })
+
+    it('should #eval from absolute path', function(done) {
+      let p = require.resolve('./fixtures/foo.js')
+      expect(path.isAbsolute(p)).to.be.true
+      live.eval(p, function(value) {
+        expect(value).to.match(/^Value: \d/)
         done()
       })
     })
@@ -161,6 +179,14 @@ describe('live', function() {
     it('should return full path from local path', function() {
       live.path('fixtures/foo.txt', function(p) {
         expect(p).to.equal(require.resolve('./fixtures/foo.txt'))
+      })
+    })
+
+    it('should return full path from absolute path', function() {
+      let path_p = require.resolve('./fixtures/foo.txt')
+      expect(path.isAbsolute(path_p)).to.be.true
+      live.path(path_p, function(p) {
+        expect(p).to.equal(path_p)
       })
     })
   }) // #path
