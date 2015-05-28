@@ -26,12 +26,12 @@ describe('live', function() {
     })
   }) // #read
 
-  describe('#eval', function() {
+  describe('#require', function() {
     let evalValue = null
     it('should evaluate code from local path', function(done) {
-      live.require('./fixtures/foo', function(value) {
-        expect(value).to.match(/^Value: \d/)
-        evalValue = value
+      live.require('./fixtures/foo.js', function(exports) {
+        expect(exports.v).to.match(/^Value: \d/)
+        evalValue = exports.v
         done()
       })
     })
@@ -39,34 +39,68 @@ describe('live', function() {
     it('should #eval from absolute path', function(done) {
       let p = require.resolve('./fixtures/foo.js')
       expect(path.isAbsolute(p)).to.be.true
-      live.require(p, function(value) {
-        expect(value).to.match(/^Value: \d/)
+      live.require(p, function(exports) {
+        expect(exports.v).to.match(/^Value: \d/)
         done()
       })
     })
 
-    it('should only evaluate code once', function() {
-      live.require('./fixtures/foo', function(value) {
-        expect(value).to.equal(evalValue)
+    it('should only evaluate code once', function(done) {
+      live.require('./fixtures/foo', function(exports) {
+        expect(exports.v).to.equal(evalValue)
+        done()
       })
     })
 
     it('should not export global values', function(done) {
       var live_foo = 'Set in live_test.js'
-      live.require('./fixtures/foo.js', function(value) {
+      live.require('./fixtures/foo.js', function() {
         expect(live_foo).to.equal('Set in live_test.js')
         done()
       })
     })
 
-    it('should reload with same module', function(done) {
-      live.require('./fixtures/foo.js', function(value) {
-        expect(value).to.match(/^Value: \d/)
-        evalValue = value
+    it('BB should reload with same module', function(done) {
+      live.clear()
+      let values = []
+      let fp  = require.resolve('./fixtures/foo.js')
+      let fp_orig = fs.readFileSync(fp)
+
+      let steps = function*() {
+        values.push(yield)
+
+        // touch foo.js
+        fs.appendFileSync(fp, '/* foo */')
+        values.push(yield)
+
+        expect(values).to.deep.equal([1, 2])
+        done()
+      }()
+
+      after(function(done) {
+        fs.writeFile(fp, fp_orig, function() {
+          done()
+        })
+        live.clear()
+      })
+
+      steps.next()
+
+      live.require('./fixtures/foo.js', function(exports) {
+        steps.next(exports.i)
+      })
+
+      live.watch('./fixtures')
+    })
+
+    it('should accept caller path parameter', function(done) {
+      let caller_p = require.resolve('./fixtures/bar.js')
+      live.require('./foo.js', caller_p, function(exports) {
+        expect(exports.v).to.match(/^Value: \d/)
         done()
       })
     })
-  }) // #eval
+  }) // #require
 
   describe('#watch', function() {
     let p  = require.resolve('./fixtures/bar.js')
@@ -206,20 +240,4 @@ describe('live', function() {
       })
     })
   }) // #path
-
-  describe('#once', function() {
-    it('should run callback only once', function() {
-      let code = `live.once(function() {
-        return Math.random()
-      })`
-
-      global.live = live
-      let rval1 = vm.runInThisContext(code, {filename: 'foobar.js'})
-      let rval2 = vm.runInThisContext(code, {filename: 'foobar.js'})
-      global.live = null
-      
-      expect(rval2).to.equal(rval1)
-    })
-  }) // #once
-
 }) // lucy-live

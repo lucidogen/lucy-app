@@ -26,6 +26,7 @@ const caller = require('caller')
 const lpath  = require('path')
 const fs     = require('fs')
 const vm     = require('vm')
+const Module = require('module')
 
 const lib = {}
 
@@ -65,14 +66,15 @@ const getData = function(h, force) {
 // If we change 'onChangedPath' to not read file content to detect file changes,
 // we need to change the HANDLERS to use getData and adapt cache code
 // accordingly.
-const onChangedPath = function(h, callback) {
+const onChangedPath = function(h) {
   getData(h, true).then(function(data) {
     if (h.readValue == data) {
       // same. ignore
     } else {
+      // console.log(`onChangedPath("${h.path}")`)
       h.evalValue = null
       h.readValue = data
-      callback(h)
+      reload(h)
     }
   })
 }
@@ -85,7 +87,7 @@ const HANDLERS =
     { js: function(h, clbk) {
         if (h.evalValue) {
           clbk(h.evalValue)
-        } else {
+        } else if (h.readValue) {
           let v = evalCode(h, h.readValue)
           if (h.error) {
             console.log(h.error.toString())
@@ -93,6 +95,20 @@ const HANDLERS =
             h.evalValue = v
             clbk(v)
           }
+        } else {
+          // This is just in case we have a race condition where
+          // LOAD_PATHS[h.path] exists but we have not yet finished running
+          // getData (and thus h.readValue is null).
+          getData(h).then(function(data) {
+            h.readValue = data
+            let v = evalCode(h, data)
+            if (h.error) {
+              console.log(h.error.toString())
+            } else {
+              h.evalValue = v
+              clbk(v)
+            }
+          })
         }
       }
     } 
@@ -126,16 +142,38 @@ const evalCode = function(h, code) {
   
   h.error = null
 
+  let self = h.self
+  if (!self) {
+    // Setup 'module' used inside evaluated code.
+    self = new Module(h.path, Module._cache[h.caller_p])
+    self.filename = h.path
+    h.self = self
+    h.dirname = lpath.dirname(h.path)
+    h.require = function(path) {
+      // Require inside the module to load 'children' code
+      return Module._load(path, self)
+    }
+  }
+  let sandbox =
+    { require:h.require
+    , global:global
+    , __filename: h.path
+    , __dirname:  h.dirname
+    , console:console
+    , module:self
+    , exports:self.exports
+    }
+
   CALLBACK_ORIGIN = h.path
     let rval
     try {
-      rval = vm.runInNewContext(code,
-        { require:require
-        , global:global
-        , console:console
-        , module:h.self
-        }, {filename: h.path})
-      rval = h.self.exports
+      h.error = null
+      rval = vm.runInNewContext(code, sandbox, {filename: h.path})
+      if (!self.loaded) {
+        self.loaded = true
+        Module._cache[h.path] = self
+      }
+      rval = self.exports
     } catch(err) {
       h.error = err
     }
@@ -156,7 +194,7 @@ const reload = function(h) {
   }
 }
 
-const setupCallback = function(path, callback, handler) {
+const setupCallback = function(path, callback, handler, caller_p) {
   let clbk =
     { origin:   CALLBACK_ORIGIN
     , callback: callback
@@ -171,12 +209,11 @@ const setupCallback = function(path, callback, handler) {
   if (!h) {
     h = { callbacks: [clbk]
         , path: path
-          // this is used during eval to emulate require
-        , self: {}
+        , caller_p: caller_p
         }
 
     LOAD_PATHS[path] = h
-    onChangedPath(h, reload)
+    onChangedPath(h)
   } else {
     h.callbacks.push(clbk)
     clbk.handler(h, clbk.callback)
@@ -246,6 +283,10 @@ const findPath = function(request, paths) {
   return false
 }
 
+const pathFromCaller = function(caller_id) {
+  return lpath.resolve(caller_id.substr(caller_id.indexOf(':') + 1))
+}
+
 const resolvePath = function(path, caller_p) {
   let filename
   let start = path.substr(0, 2)
@@ -253,7 +294,7 @@ const resolvePath = function(path, caller_p) {
     // absolute path
     filename = path
   } else if (start == './' || start == '..') {
-    let base = lpath.dirname(caller_p.substr(caller_p.indexOf(':') + 1))
+    let base = lpath.dirname(caller_p)
     filename = lpath.resolve(base, path)
   } else {
     // funky node_modules path not supported
@@ -269,7 +310,7 @@ const resolveFilename = function(path, caller_p) {
     // absolute or funky node_modules require
     paths = module.paths
   } else {
-    let base = lpath.dirname(caller_p.substr(caller_p.indexOf(':') + 1))
+    let base = lpath.dirname(caller_p)
     paths = [base]
   }
   let filename = findPath(path, paths)
@@ -304,17 +345,25 @@ const resolveFilename = function(path, caller_p) {
  * file changes.
  */
 lib.read = function(path, callback) {
-  let filename = resolveFilename(path, caller())
-  setupCallback(filename, callback, HANDLERS.read)
+  let caller_p = pathFromCaller(caller())
+  let filename = resolveFilename(path, caller_p)
+  setupCallback(filename, callback, HANDLERS.read, caller_p)
 }
 
 /* Async require file at `path` and trigger `callback` every time the file
  * changes. File/module location implementation follows standard `require`
- * [rules](https://nodejs.org/api/modules.html#modules_all_together).
+ * [rules](https://nodejs.org/api/modules.html#modules_all_together). The
+ * function can take an optional `caller_path` argument.
  * 
  * The `module.exports` is passed as argument to the callback. During each code
  * reload operation, the `module` object is maintained and can be used to store
- * stable state information.
+ * stable state information. Since the module contains other information, it is
+ * good practice to store values in a single field, like 'lucy'.
+ *
+ *   if (!module.lucy) {
+ *     // initialize module.lucy with state
+ *   }
+ *   const lucy = module.lucy
  *
  * Compared to Module.require, the 'global' field is not copied as real globals
  * inside the module's sandbox for performance reasons (with the exception of
@@ -326,13 +375,20 @@ lib.read = function(path, callback) {
  * code module stored globally).
  */
 lib.require = function(path, callback) {
-  let filename = resolveFilename(path, caller())
+  let caller_p
+  if (arguments.length > 2) {
+    caller_p = callback
+    callback = arguments[2]
+  } else {
+    caller_p = pathFromCaller(caller())
+  }
+  let filename = resolveFilename(path, caller_p)
   let type = getType(filename)
   let handler = HANDLERS.eval[type]
   if (!handler) {
     throw new Error(`Missing handler to evaluate ${type} code.`)
   }
-  setupCallback(filename, callback, handler)
+  setupCallback(filename, callback, handler, caller_p)
 }
 
 /* Watch for changes to local `path` and trigger `callback` every time the file
@@ -341,8 +397,10 @@ lib.require = function(path, callback) {
  * The fullpath of the file is passed as callback parameter.
  */
 lib.path = function(path, callback) {
-  let filename = resolveFilename(path, caller())
-  setupCallback(filename, callback, HANDLERS.path)
+  let caller_p = pathFromCaller(caller())
+  let filename = resolveFilename(path, caller_p)
+  // Module._cache[filename]
+  setupCallback(filename, callback, HANDLERS.path, caller_p)
 }
 
 /* Clear all previously defined watches and callbacks.
@@ -361,8 +419,8 @@ lib.clear = function() {
 /* Start listening for file changes in a given `path` (relative to the
  * calling script).
  */
-lib.watch = function(path) {
-  let filename = resolvePath(path, caller())
+lib.watch = function(path) {       
+  let filename = resolvePath(path, pathFromCaller(caller()))
   
   if (WATCHED_PATHS[filename]) {
     // nothing to do
@@ -373,7 +431,8 @@ lib.watch = function(path) {
       if (!h) {
         // console.log('unknown changed file "'+p+'"')
       } else {
-        onChangedPath(h, reload)
+        // console.log('Changed file "'+p+'"')
+        onChangedPath(h)
       }
     })
     WATCHED_PATHS[filename] = watcher
@@ -382,17 +441,20 @@ lib.watch = function(path) {
 
 /* Execute the code in the callback only once and return the same value on any
  * subsequent call.
- */
+ *
+ * NOT A GOOD IDEA. LOOKS LIKE IT CAN BE CALLED IN MULTIPLE PLACES IN THE CODE.
+ * USE module.x INSTEAD.
+ *
 lib.once = function(callback) {
-  let caller_p = caller()
-  let path = lpath.resolve(caller_p.substr(caller_p.indexOf(':') + 1))
+  let caller_p = pathFromCaller(caller())
 
-  let value = ONCE_CACHE[path]
+  let value = ONCE_CACHE[caller_p]
   if (value == undefined) {
     value = callback()
     ONCE_CACHE[path] = value
   }
   return value
 }
+ */
 
 module.exports = lib
