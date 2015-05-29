@@ -69,7 +69,7 @@ describe('live', function() {
       })
     })
 
-    it('BB should reload with same module', function(done) {
+    it('should reload with same module', function(done) {
       live.clear()
       let values = []
       let fp  = require.resolve('./fixtures/foo.js')
@@ -102,9 +102,9 @@ describe('live', function() {
       live.watch('./fixtures')
     })
 
-    it('should accept caller path parameter', function(done) {
-      let caller_p = require.resolve('./fixtures/bar.js')
-      live.require('./foo.js', caller_p, function(exports) {
+    it('should accept base path parameter', function(done) {
+      let base = path.resolve(__dirname, 'fixtures')
+      live.require('./foo.js', base, function(exports) {
         expect(exports.v).to.match(/^Value: \d/)
         done()
       })

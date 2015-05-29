@@ -145,7 +145,7 @@ const evalCode = function(h, code) {
   let self = h.self
   if (!self) {
     // Setup 'module' used inside evaluated code.
-    self = new Module(h.path, Module._cache[h.caller_p])
+    self = new Module(h.path, h.caller_p ? Module._cache[h.caller_p] : null)
     self.filename = h.path
     h.self = self
     h.dirname = lpath.dirname(h.path)
@@ -287,14 +287,14 @@ const pathFromCaller = function(caller_id) {
   return lpath.resolve(caller_id.substr(caller_id.indexOf(':') + 1))
 }
 
-const resolvePath = function(path, caller_p) {
+// Used by watch. Not full resolution.
+const resolvePath = function(path, base) {
   let filename
   let start = path.substr(0, 2)
   if (path.charAt(0) === '/') {
     // absolute path
     filename = path
   } else if (start == './' || start == '..') {
-    let base = lpath.dirname(caller_p)
     filename = lpath.resolve(base, path)
   } else {
     // funky node_modules path not supported
@@ -303,14 +303,14 @@ const resolvePath = function(path, caller_p) {
   return filename
 }
 
-const resolveFilename = function(path, caller_p) {
+// Used by require
+const resolveFilename = function(path, base) {
   let start = path.substr(0, 2)
   let paths
   if (start != './' && start != '..') {
     // absolute or funky node_modules require
     paths = module.paths
   } else {
-    let base = lpath.dirname(caller_p)
     paths = [base]
   }
   let filename = findPath(path, paths)
@@ -346,14 +346,15 @@ const resolveFilename = function(path, caller_p) {
  */
 lib.read = function(path, callback) {
   let caller_p = pathFromCaller(caller())
-  let filename = resolveFilename(path, caller_p)
+  let filename = resolveFilename(path, lpath.dirname(caller_p))
   setupCallback(filename, callback, HANDLERS.read, caller_p)
 }
 
 /* Async require file at `path` and trigger `callback` every time the file
  * changes. File/module location implementation follows standard `require`
  * [rules](https://nodejs.org/api/modules.html#modules_all_together). The
- * function can take an optional `caller_path` argument.
+ * function can take an optional second argument: `base_path`, the starting
+ * point from where to start searching for the path.
  * 
  * The `module.exports` is passed as argument to the callback. During each code
  * reload operation, the `module` object is maintained and can be used to store
@@ -375,14 +376,15 @@ lib.read = function(path, callback) {
  * code module stored globally).
  */
 lib.require = function(path, callback) {
-  let caller_p
+  let base, caller_p
   if (arguments.length > 2) {
-    caller_p = callback
+    base     = callback
     callback = arguments[2]
   } else {
     caller_p = pathFromCaller(caller())
+    base = lpath.dirname(caller_p)
   }
-  let filename = resolveFilename(path, caller_p)
+  let filename = resolveFilename(path, base)
   let type = getType(filename)
   let handler = HANDLERS.eval[type]
   if (!handler) {
@@ -398,7 +400,7 @@ lib.require = function(path, callback) {
  */
 lib.path = function(path, callback) {
   let caller_p = pathFromCaller(caller())
-  let filename = resolveFilename(path, caller_p)
+  let filename = resolveFilename(path, lpath.dirname(caller_p))
   // Module._cache[filename]
   setupCallback(filename, callback, HANDLERS.path, caller_p)
 }
@@ -420,7 +422,7 @@ lib.clear = function() {
  * calling script).
  */
 lib.watch = function(path) {       
-  let filename = resolvePath(path, pathFromCaller(caller()))
+  let filename = resolvePath(path, lpath.dirname(pathFromCaller(caller())))
   
   if (WATCHED_PATHS[filename]) {
     // nothing to do
