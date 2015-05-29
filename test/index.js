@@ -28,7 +28,7 @@ describe('live', function() {
 
   describe('#require', function() {
     let evalValue = null
-    it('should evaluate code from local path', function(done) {
+    it('should load code from local path', function(done) {
       live.require('./fixtures/foo.js', function(exports) {
         expect(exports.v).to.match(/^Value: \d/)
         evalValue = exports.v
@@ -36,11 +36,20 @@ describe('live', function() {
       })
     })
 
-    it('should #eval from absolute path', function(done) {
+    it('should load from absolute path', function(done) {
       let p = require.resolve('./fixtures/foo.js')
       expect(path.isAbsolute(p)).to.be.true
       live.require(p, function(exports) {
         expect(exports.v).to.match(/^Value: \d/)
+        done()
+      })
+    })
+
+    it('should load from index in path', function(done) {
+      let p = require.resolve('./fixtures/foo.js')
+      expect(path.isAbsolute(p)).to.be.true
+      live.require('./fixtures/bloom', function(exports) {
+        expect(exports.name).to.equal('Bloom')
         done()
       })
     })
