@@ -69,7 +69,7 @@ describe('live', function() {
       })
     })
 
-    it('should reload with same module', function(done) {
+    it('should reload with same module.exports', function(done) {
       live.clear()
       let values = []
       let fp  = require.resolve('./fixtures/foo.js')

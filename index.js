@@ -103,7 +103,7 @@ const HANDLERS =
             h.readValue = data
             let v = evalCode(h, data)
             if (h.error) {
-              console.log(h.error.toString())
+              console.log(h.error.toString(), `(in '${h.path}')`)
             } else {
               h.evalValue = v
               clbk(v)
@@ -357,14 +357,13 @@ lib.read = function(path, callback) {
  * point from where to start searching for the path.
  * 
  * The `module.exports` is passed as argument to the callback. During each code
- * reload operation, the `module` object is maintained and can be used to store
- * stable state information. Since the module contains other information, it is
- * good practice to store values in a single field, like 'lucy'.
+ * reload operation, the `module.exports` object is maintained and can be used to store
+ * stable state information.
  *
- *   if (!module.lucy) {
- *     // initialize module.lucy with state
+ *   if (!exports.state) {
+ *     // initialize state
  *   }
- *   const lucy = module.lucy
+ *   const state = exports.state
  *
  * Compared to Module.require, the 'global' field is not copied as real globals
  * inside the module's sandbox for performance reasons (with the exception of
