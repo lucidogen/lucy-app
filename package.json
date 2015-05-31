@@ -26,8 +26,8 @@
     "url": "https://github.com/lucidogen/live/issues"
   },
   "devDependencies": {
-    "mocha": "~1.16.2",
-    "chai": "~1.8.1"
+    "chai": "^2.3.0",
+    "mocha": "~1.16.2"
   },
   "dependencies": {
     "caller": "^1.0.0"

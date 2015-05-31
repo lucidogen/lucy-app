@@ -392,6 +392,9 @@ lib.read = function(path, callback) {
  * the `exports`. If an error is raised during code loading/evaluation, the
  * error is passed. If the callback does not have two arguments, the error is
  * simply printed.
+ *
+ * TODO: return an object on which we can add an error handler with 
+ *       'catch(e) { done(e) }' ?
  */
 lib.require = function(path, callback) {
   let base, caller_p

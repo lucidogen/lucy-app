@@ -1,9 +1,11 @@
 'use strict'
+
+require('chai').should()
+
 const vm = require('vm')
 const path = require('path')
 const fs   = require('fs')
 
-const expect = require('chai').expect
 const live   = require('../index')
 
 describe('live', function() {
@@ -11,16 +13,16 @@ describe('live', function() {
   describe('#read', function() {
     it('should #read file from local path', function(done) {
       live.read('./fixtures/foo.txt', function(txt) {
-        expect(txt).to.equal('Hello Lucy !\n')
+        txt.should.equal('Hello Lucy !\n')
         done()
       })
     })
 
     it('should #read file from absolute path', function(done) {
       let p = require.resolve('./fixtures/foo.txt')
-      expect(path.isAbsolute(p)).to.be.true
+      path.isAbsolute(p).should.be.true
       live.read(p, function(txt) {
-        expect(txt).to.equal('Hello Lucy !\n')
+        txt.should.equal('Hello Lucy !\n')
         done()
       })
     })
@@ -30,7 +32,7 @@ describe('live', function() {
     let evalValue = null
     it('should load code from local path', function(done) {
       live.require('./fixtures/foo.js', function(foo) {
-        expect(foo.v).to.match(/^Value: \d/)
+        foo.v.should.match(/^Value: \d/)
         evalValue = foo.v
         done()
       })
@@ -38,25 +40,25 @@ describe('live', function() {
 
     it('should load from absolute path', function(done) {
       let p = require.resolve('./fixtures/foo.js')
-      expect(path.isAbsolute(p)).to.be.true
+      path.isAbsolute(p).should.be.true
       live.require(p, function(foo) {
-        expect(foo.v).to.match(/^Value: \d/)
+        foo.v.should.match(/^Value: \d/)
         done()
       })
     })
 
     it('should load from index in path', function(done) {
       let p = require.resolve('./fixtures/foo.js')
-      expect(path.isAbsolute(p)).to.be.true
+      path.isAbsolute(p).should.be.true
       live.require('./fixtures/bloom', function(foo) {
-        expect(foo.name).to.equal('Bloom')
+        foo.name.should.equal('Bloom')
         done()
       })
     })
 
     it('should only evaluate code once', function(done) {
       live.require('./fixtures/foo', function(foo) {
-        expect(foo.v).to.equal(evalValue)
+        foo.v.should.equal(evalValue)
         done()
       })
     })
@@ -64,7 +66,7 @@ describe('live', function() {
     it('should not export global values', function(done) {
       var live_foo = 'Set in live_test.js'
       live.require('./fixtures/foo.js', function() {
-        expect(live_foo).to.equal('Set in live_test.js')
+        live_foo.should.equal('Set in live_test.js')
         done()
       })
     })
@@ -82,7 +84,7 @@ describe('live', function() {
         fs.appendFileSync(fp, '/* foo */')
         values.push(yield)
 
-        expect(values).to.deep.equal([1, 2])
+        values.should.deep.equal([1, 2])
         done()
       }()
 
@@ -105,7 +107,7 @@ describe('live', function() {
     it('should accept base path parameter', function(done) {
       let base = path.resolve(__dirname, 'fixtures')
       live.require('./foo.js', base, function(foo) {
-        expect(foo.v).to.match(/^Value: \d/)
+        foo.v.should.match(/^Value: \d/)
         done()
       })
     })
@@ -114,7 +116,7 @@ describe('live', function() {
       // The error raised during code evaluation simply prints an error: we
       // cannot bubble up from the callback.
       live.require('./fixtures/error.js', function(err, foo) {
-        expect(err.toString()).to.match(/This is an error in error.js./)
+        err.toString().should.match(/This is an error in error.js./)
         done()
       })
     })
@@ -166,7 +168,7 @@ describe('live', function() {
         fs.writeFile(p, 'module.exports = "This is barmaid."')
         yield
         // last reload, just end test
-        expect(values).to.deep.equal(
+        values.should.deep.equal(
           [ 'This is bar.'
           , 'This is barman.'
           , 'This is barmaid.'
@@ -218,7 +220,7 @@ describe('live', function() {
         values.push(yield)
         
         // last reload, just end test
-        expect(values).to.deep.equal(
+        values.should.deep.equal(
           [ 'reload:live_reload_1'
           , 'bar:live_reload_1'
           , 'bar:live_reload_1'
@@ -246,15 +248,15 @@ describe('live', function() {
   describe('#path', function() {
     it('should return full path from local path', function() {
       live.path('./fixtures/foo.txt', function(p) {
-        expect(p).to.equal(require.resolve('./fixtures/foo.txt'))
+        p.should.equal(require.resolve('./fixtures/foo.txt'))
       })
     })
 
     it('should return full path from absolute path', function() {
       let path_p = require.resolve('./fixtures/foo.txt')
-      expect(path.isAbsolute(path_p)).to.be.true
+      path.isAbsolute(path_p).should.be.true
       live.path(path_p, function(p) {
-        expect(p).to.equal(path_p)
+        p.should.equal(path_p)
       })
     })
   }) // #path
