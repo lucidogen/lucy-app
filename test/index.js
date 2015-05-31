@@ -29,9 +29,9 @@ describe('live', function() {
   describe('#require', function() {
     let evalValue = null
     it('should load code from local path', function(done) {
-      live.require('./fixtures/foo.js', function(exports) {
-        expect(exports.v).to.match(/^Value: \d/)
-        evalValue = exports.v
+      live.require('./fixtures/foo.js', function(foo) {
+        expect(foo.v).to.match(/^Value: \d/)
+        evalValue = foo.v
         done()
       })
     })
@@ -39,8 +39,8 @@ describe('live', function() {
     it('should load from absolute path', function(done) {
       let p = require.resolve('./fixtures/foo.js')
       expect(path.isAbsolute(p)).to.be.true
-      live.require(p, function(exports) {
-        expect(exports.v).to.match(/^Value: \d/)
+      live.require(p, function(foo) {
+        expect(foo.v).to.match(/^Value: \d/)
         done()
       })
     })
@@ -48,15 +48,15 @@ describe('live', function() {
     it('should load from index in path', function(done) {
       let p = require.resolve('./fixtures/foo.js')
       expect(path.isAbsolute(p)).to.be.true
-      live.require('./fixtures/bloom', function(exports) {
-        expect(exports.name).to.equal('Bloom')
+      live.require('./fixtures/bloom', function(foo) {
+        expect(foo.name).to.equal('Bloom')
         done()
       })
     })
 
     it('should only evaluate code once', function(done) {
-      live.require('./fixtures/foo', function(exports) {
-        expect(exports.v).to.equal(evalValue)
+      live.require('./fixtures/foo', function(foo) {
+        expect(foo.v).to.equal(evalValue)
         done()
       })
     })
@@ -95,8 +95,8 @@ describe('live', function() {
 
       steps.next()
 
-      live.require('./fixtures/foo.js', function(exports) {
-        steps.next(exports.i)
+      live.require('./fixtures/foo.js', function(foo) {
+        steps.next(foo.i)
       })
 
       live.watch('./fixtures')
@@ -104,8 +104,17 @@ describe('live', function() {
 
     it('should accept base path parameter', function(done) {
       let base = path.resolve(__dirname, 'fixtures')
-      live.require('./foo.js', base, function(exports) {
-        expect(exports.v).to.match(/^Value: \d/)
+      live.require('./foo.js', base, function(foo) {
+        expect(foo.v).to.match(/^Value: \d/)
+        done()
+      })
+    })
+
+    it('should handle errors in required code', function(done) {
+      // The error raised during code evaluation simply prints an error: we
+      // cannot bubble up from the callback.
+      live.require('./fixtures/error.js', function(err, foo) {
+        expect(err.toString()).to.match(/This is an error in error.js./)
         done()
       })
     })

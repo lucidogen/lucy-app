@@ -74,41 +74,59 @@ const onChangedPath = function(h) {
       // console.log(`onChangedPath("${h.path}")`)
       h.evalValue = null
       h.readValue = data
-      reload(h)
+      // reload
+      let callbacks = h.callbacks
+      for(let i = callbacks.length-1; i >= 0 ; --i) {
+        let clbk = callbacks[i]
+        clbk.handler(h, clbk.callback)
+      }
     }
   })
 }
 
+const triggerCallback = function(clbk, error, value) {
+  try {
+    if (error) {
+      if (clbk.length > 1) {
+        clbk(error)
+      } else {
+        console.log(error.toString())
+        // console.log(h.error.toString(), `(in '${h.path}')`)
+      }
+    } else {
+      if (clbk.length == 1) {
+        clbk(value)
+      } else {
+        clbk(null, value)
+      }
+    }
+  } catch(e) {
+    console.log(e.stack)
+  }
+}
+
 // Reloading code
 const HANDLERS =
-  { read: function(h, clbk) { clbk(h.readValue) }
-  , path: function(h, clbk) { clbk(h.path) }
+  { read: function(h, clbk) { triggerCallback(clbk, h.error, h.readValue) }
+  , path: function(h, clbk) { triggerCallback(clbk, h.error, h.path) }
   , eval:
     { js: function(h, clbk) {
-        if (h.evalValue) {
-          clbk(h.evalValue)
-        } else if (h.readValue) {
-          let v = evalCode(h, h.readValue)
-          if (h.error) {
-            console.log(h.error.toString())
-          } else {
-            h.evalValue = v
-            clbk(v)
-          }
+        if (h.evalValue || h.error) {
+          triggerCallback(clbk, h.error, h.evalValue)
         } else {
-          // This is just in case we have a race condition where
-          // LOAD_PATHS[h.path] exists but we have not yet finished running
-          // getData (and thus h.readValue is null).
-          getData(h).then(function(data) {
-            h.readValue = data
-            let v = evalCode(h, data)
-            if (h.error) {
-              console.log(h.error.toString(), `(in '${h.path}')`)
-            } else {
-              h.evalValue = v
-              clbk(v)
-            }
-          })
+          if (h.readValue) {
+            evalCode(h)
+            triggerCallback(clbk, h.error, h.evalValue)
+          } else {
+            // This is just in case we have a race condition where
+            // LOAD_PATHS[h.path] exists but we have not yet finished running
+            // getData (and thus h.readValue is null).
+            getData(h).then(function(data) {
+              h.readValue = data
+              evalCode(h)
+              triggerCallback(clbk, h.error, h.evalValue)
+            })
+          }
         }
       }
     } 
@@ -117,10 +135,11 @@ const HANDLERS =
 const emptyClbk = function() {}
 
 // This is set to the currently evaled (reloaded) path to clear callbacks
-// accordingly on reload (see below)
+// accordingly on evalCode
 let CALLBACK_ORIGIN
 
-const evalCode = function(h, code) {
+const evalCode = function(h) {
+  let code = h.readValue
 
   // Clear callbakcs previously defined through eval (we do not want to
   // trigger callbacks in dead code).
@@ -174,25 +193,16 @@ const evalCode = function(h, code) {
         Module._cache[h.path] = self
       }
       rval = self.exports
+      h.evalValue = rval
     } catch(err) {
       h.error = err
     }
   CALLBACK_ORIGIN = null
-
-  return rval
 }
 
 const getType = function(p) {
   return lpath.extname(p).substr(1)
 }  
-
-const reload = function(h) {
-  let callbacks = h.callbacks
-  for(let i = callbacks.length-1; i >= 0 ; --i) {
-    let clbk = callbacks[i]
-    clbk.handler(h, clbk.callback)
-  }
-}
 
 const setupCallback = function(path, callback, handler, caller_p) {
   let clbk =
@@ -223,7 +233,7 @@ const setupCallback = function(path, callback, handler, caller_p) {
 const statPath = function(path) {
   try {
     return fs.statSync(path)
-  } catch (ex) {}
+  } catch (e) {}
   return false
 }
 
@@ -343,6 +353,10 @@ const resolveFilename = function(path, base) {
 
 /* Async read file content at local `path` and trigger `callback` every time the
  * file changes.
+ *
+ * If the callback has two arguments, the first one is `error` and the second is
+ * the `fullpath`. If the callback does not have two arguments, the error is
+ * simply printed.
  */
 lib.read = function(path, callback) {
   let caller_p = pathFromCaller(caller())
@@ -373,6 +387,11 @@ lib.read = function(path, callback) {
  * Finally, live.require does not load packages by parsing package.json (yet)
  * and does not try to find modules in global paths (it makes no sense to live
  * code module stored globally).
+ *
+ * If the callback has two arguments, the first one is `error` and the second is
+ * the `exports`. If an error is raised during code loading/evaluation, the
+ * error is passed. If the callback does not have two arguments, the error is
+ * simply printed.
  */
 lib.require = function(path, callback) {
   let base, caller_p
@@ -396,6 +415,10 @@ lib.require = function(path, callback) {
  * changes.
  *
  * The fullpath of the file is passed as callback parameter.
+ *
+ * If the callback has two arguments, the first one is `error` and the second is
+ * the `fullpath`. If the callback does not have two arguments, the error is
+ * simply printed.
  */
 lib.path = function(path, callback) {
   let caller_p = pathFromCaller(caller())
