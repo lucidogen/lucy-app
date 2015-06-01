@@ -1,6 +1,6 @@
 # Lucy App
 
-## Simple runtime for Lucidity apps
+## Simple runtime for Lucidity applications
 
 lucy.app helps loading scenes and runs the animate loop.
 
