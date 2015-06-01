@@ -1,33 +1,53 @@
-# Lucy Live
+# Lucy App
 
-## Live coding support for nodejs
+## Simple runtime for Lucidity apps
 
-lucy.live helps live coding with Javascript by watching files for changes and
-providing a mechanism to trigger hooks when needed.
+lucy.app helps loading scenes and runs the animate loop.
 
-Usage example:
+Usage example (without live coding):
 
 ```js
+  // Singleton
+  const app  = require('lucy-app')
+  const main = require('./scene/index')
+
+  main.setup()
+
+  app.run(main)
+```
+
+Usage example (live coding):
+
+```js
+  // Singleton
+  const app  = require('lucy-app')
   const live = require('lucy-live')
-
-  // expects foo.js library to return "obj"
-  live.load('foo.js', function(obj) {
-    console.log('foo changed: ' + obj)
-  }
-
-  live.path('image.jpg', function(p) {
-    // do something with new image taking
-    // care of Browser cache
+  live.require('./scene/index', function(s) {
+    s.setup()
+    app.run(s)
   })
+```
 
-  // Start listening for changes in '.'
-  live.watch('.')
+Usage example (live coding, scene composition):
+
+```js
+  // Singleton
+  const app   = require('lucy-app')
+  const comp  = require('lucy-compose').load
+
+  const fx    = comp.load('./fx')
+  const scene = comp.load('./scene')
+
+  // setup and live reload is managed by composer
+  fx('blur, scene('triangle')).ready.then(function(s) {
+    app.run(s)
+  })
 ```
 
 ## Installation
 
 ```shell
-  npm install lucy-live --save
+  npm install lucidogen/lucy-app --save
 ```
 
 ## Tests
