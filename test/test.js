@@ -1,7 +1,7 @@
 'use strict'
 
 require('chai').should()
-const Application = require('../app/Application')
+const Application = require('../lib/Application')
 
 describe('app', function() {
   let app = require('../index')

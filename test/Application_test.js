@@ -1,7 +1,7 @@
 'use strict'
 
 require('chai').should()
-const Application = require('../app/Application')
+const Application = require('../lib/Application')
 
 // mock requestAnimationFrame
 if (!global.requestAnimationFrame) {
@@ -36,6 +36,10 @@ describe('Application', function() {
   describe('#now', function() {
     it('should return elapsed time in seconds', function(done) {
       let start_t = app.now()
+      // warmup
+      setTimeout(function() {
+        app.now()
+      }, 5)
       setTimeout(function() {
         let now = app.now() - start_t
         now.should.be.above(19.995/1000)
