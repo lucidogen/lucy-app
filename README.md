@@ -47,7 +47,7 @@ Usage example (live coding, scene composition):
 ## Installation
 
 ```shell
-  npm install lucidogen/lucy-app --save
+  npm install --save git+ssh://git@bitbucket.org/lucidogen/lucy-app.git
 ```
 
 ## Tests
