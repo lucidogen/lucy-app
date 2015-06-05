@@ -2,6 +2,7 @@
 
 require('chai').should()
 const Application = require('../lib/Application')
+const elapsed = require('lucy-util').elapsed
 
 // mock requestAnimationFrame
 if (!global.requestAnimationFrame) {
@@ -13,17 +14,17 @@ if (!global.requestAnimationFrame) {
 describe('Application', function() {
   let app = new Application
   describe('#run', function() {
-    it('should run scene by calling render with time', function(done) {
+    it('should run scene by calling render with updated time', function(done) {
       let i = 0
-      let start_t = Date.now() / 1000
+      let start_t = elapsed()
       app.run(
-        { render: function(time) {
+        { render: function() {
             ++i
             if (i == 2) {
-              let now = Date.now() / 1000
+              let now = elapsed()
               i.should.equal(2)
-              time.should.be.above(now - start_t)
-                         .and.below(now - start_t + 0.34)
+              app.time.should.be.above(now - start_t)
+                            .and.below(now - start_t + 0.34) // 0.34 = roughly 2 frames
               done()
               app.stop()
             }
@@ -33,19 +34,25 @@ describe('Application', function() {
     })
   }) // #run
 
-  describe('#now', function() {
-    it('should return elapsed time in seconds', function(done) {
-      let start_t = app.now()
-      // warmup
-      setTimeout(function() {
-        app.now()
-      }, 5)
-      setTimeout(function() {
-        let now = app.now() - start_t
-        now.should.be.above(19.995/1000)
-                 .and.below(21.005/1000)
-        done()
-      }, 20)
+  describe('.time', function() {
+    it('should contain elapsed time in seconds', function() {
+      app.setTime(0)
+      app.time.should.equal(0)
     })
-  }) // #now
+  }) // .time
+
+  describe('.bpm', function() {
+    it('should contain beat per minute information from sync', function() {
+      app.bpm.should.equal(120) // default value
+    })
+  }) // .bpm
+
+  describe('.song', function() {
+    it('should contain song position', function() {
+      app.setTime(0)
+      app.song.should.equal(0)
+      app.setTime(60)
+      app.song.should.equal(app.bpm * 4) // song counted in 1/16th of a note, beat is 1/4th
+    })
+  }) // .song
 }) // app
