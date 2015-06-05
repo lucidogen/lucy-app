@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/lucidogen/lucy-app.git"
+    "url": "git@bitbucket.org:lucidogen/lucy-app.git"
   },
   "keywords": [
     "application",
@@ -23,7 +23,7 @@
     }
   ],
   "bugs": {
-    "url": "https://github.com/lucidogen/lucy-app/issues"
+    "url": "https://bitbucket.org/lucidogen/lucy-app/issues"
   },
   "devDependencies": {
     "chai": "^2.3.0",
