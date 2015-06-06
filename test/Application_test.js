@@ -34,6 +34,22 @@ describe('Application', function() {
     })
   }) // #run
 
+  describe('dialog', function() {
+    it('should respond to confirm', function() {
+      app.should.respondTo('confirm')
+    })
+
+    it('should respond to prompt', function() {
+      app.should.respondTo('prompt')
+    })
+
+    it('should respond to alert', function() {
+      app.should.respondTo('alert')
+    })
+
+    // TODO: how to mock 'document' when testing ?
+  })
+
   describe('.time', function() {
     it('should contain elapsed time in seconds', function() {
       app.setTime(0)
