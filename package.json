@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "lucy-live": "git+ssh://git@bitbucket.org/lucidogen/lucy-live.git",
+    "lucy-midi": "git+ssh://git@bitbucket.org/lucidogen/lucy-midi.git",
     "lucy-util": "git+ssh://git@bitbucket.org/lucidogen/lucy-util.git",
     "ncp": "^2.0.0"
   }
