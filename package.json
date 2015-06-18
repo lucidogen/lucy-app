@@ -34,6 +34,7 @@
     "lucy-midi": "git+ssh://git@bitbucket.org/lucidogen/lucy-midi.git",
     "lucy-util": "git+ssh://git@bitbucket.org/lucidogen/lucy-util.git",
     "ncp": "^2.0.0",
-    "node-osc": "^1.1.0"
+    "node-osc": "^1.1.0",
+    "rimraf": "^2.4.0"
   }
 }
