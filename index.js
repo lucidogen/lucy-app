@@ -19,7 +19,6 @@
     require('lucy-live').watch('.')
 */
 'use strict'
-const Application = require('./lib/Application')
-const app = new Application
+const Application = require ( './lib/Application' )
 
-module.exports = app
+module.exports = new Application

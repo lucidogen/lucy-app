@@ -1,12 +1,20 @@
 'use strict'
 
-require('chai').should()
-const Application = require('../lib/Application')
+require ( 'chai' )
+.should ()
 
-describe('app', function() {
-  let app = require('../index')
-  it('should be an Application', function() {
-    app.should.be.an.instanceof(Application)
-  })
-})
+const Application = require ( '../lib/Application' )
 
+describe
+( 'app'
+, function ()
+  { let app = require ( '../index' )
+    it
+    ( 'should be an Application'
+    , function ()
+      { app
+        .should.be.an.instanceof ( Application )
+      }
+    )
+  }
+)

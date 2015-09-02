@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git@bitbucket.org:lucidogen/lucy-app.git"
+    "url": "git+ssh://git@github.com/lucidogen/lucy-app.git"
   },
   "keywords": [
     "application",
@@ -16,24 +16,23 @@
     "runtime"
   ],
   "author": "Gaspard Bucher <gaspard@lucidogen.io> (http://lucidogen.io/)",
-  "licenses": [
-    {
-      "type": "commercial",
-      "url": "http://lucidity.io/license"
-    }
-  ],
   "bugs": {
-    "url": "https://bitbucket.org/lucidogen/lucy-app/issues"
+    "url": "https://github.com/lucidogen/lucy-app/issues"
   },
   "devDependencies": {
     "chai": "^2.3.0",
     "mocha": "~1.16.2"
   },
   "dependencies": {
-    "lucy-live": "git+ssh://git@bitbucket.org/lucidogen/lucy-live.git",
-    "lucy-util": "git+ssh://git@bitbucket.org/lucidogen/lucy-util.git",
+    "lucy-live": "^0.1.1",
+    "lucy-util": "^0.1.1",
     "ncp": "^2.0.0",
     "node-osc": "^1.1.0",
     "rimraf": "^2.4.0"
-  }
+  },
+  "homepage": "https://github.com/lucidogen/lucy-app#readme",
+  "directories": {
+    "test": "test"
+  },
+  "license": "MIT"
 }
