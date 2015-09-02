@@ -73,4 +73,4 @@ Add unit tests for any new or changed functionality.
 
 ## Release History
 
-  * 0.1.0 () Initial release.
+  * 0.1.0 (2015-09-02) Initial release.
