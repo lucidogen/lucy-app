@@ -1,4 +1,6 @@
-# Lucy App
+# Lucy App [![Build Status](https://travis-ci.org/lucidogen/lucy-app.svg)](https://travis-ci.org/lucidogen/lucy-app)
+
+Part of [lucidity](http://lucidity.io) project.
 
 ## Simple runtime for Lucidity applications
 
