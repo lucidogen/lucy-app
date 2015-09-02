@@ -18,17 +18,21 @@ describe('Application', function() {
       let i = 0
       let start_t = elapsed()
       app.run(
-        { render: function() {
-            ++i
-            if (i == 2) {
-              let now = elapsed()
-              i.should.equal(2)
-              app.time.should.be.above(now - start_t)
-                            .and.below(now - start_t + 0.34) // 0.34 = roughly 2 frames
-              done()
-              app.stop()
+        { render ()
+          { ++i
+            if (i == 2)
+            { let now = elapsed ()
+              i.should.equal (2)
+              app.fx.lucy_time
+              .should.be.above(now - start_t)
+              .and.below(now - start_t + 0.34) // 0.34 = roughly 2 frames
+
+              done ()
+              app.stop ()
             }
           }
+        , online () {}
+        , _onlineSub () {}
         }
       )
     })
@@ -52,23 +56,28 @@ describe('Application', function() {
 
   describe('.time', function() {
     it('should contain elapsed time in seconds', function() {
-      app.setTime(0)
-      app.time.should.equal(0)
+      app.setTime ( 0 )
+      app.fx.lucy_time
+      .should.equal ( 0 )
     })
   }) // .time
 
   describe('.bpm', function() {
     it('should contain beat per minute information from sync', function() {
-      app.bpm.should.equal(120) // default value
+      app.fx.lucy_bpm
+      .should.equal ( 120 ) // default value
     })
   }) // .bpm
 
   describe('.song', function() {
     it('should contain song position', function() {
-      app.setTime(0)
-      app.song.should.equal(0)
-      app.setTime(60)
-      app.song.should.equal(app.bpm * 4) // song counted in 1/16th of a note, beat is 1/4th
+      app.setTime ( 0 )
+      app.fx.lucy_song
+      .should.equal ( 0 )
+
+      app.setTime ( 30 )
+      app.fx.lucy_song
+      .should.equal ( app.fx.lucy_bpm / 2 )
     })
   }) // .song
 }) // app
