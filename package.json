@@ -20,15 +20,13 @@
     "url": "https://github.com/lucidogen/lucy-app/issues"
   },
   "devDependencies": {
-    "chai": "^2.3.0",
-    "mocha": "~1.16.2"
+    "chai": "^3.2.0",
+    "mocha": "~2.3.1"
   },
   "dependencies": {
     "lucy-live": "^0.1.1",
     "lucy-util": "^0.1.1",
-    "ncp": "^2.0.0",
-    "node-osc": "^1.1.0",
-    "rimraf": "^2.4.0"
+    "node-osc": "^1.1.0"
   },
   "homepage": "https://github.com/lucidogen/lucy-app#readme",
   "directories": {
