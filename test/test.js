@@ -3,12 +3,16 @@
 require ( 'chai' )
 .should ()
 
+
 const Application = require ( '../lib/Application' )
+Application.rootpath = __dirname + '/fixtures'
+
+console.log ( Application.rootpath )
 
 describe
 ( 'app'
 , function ()
-  { let app = require ( '../index' )
+  { let app = require ( '../lib/index' )
     it
     ( 'should be an Application'
     , function ()

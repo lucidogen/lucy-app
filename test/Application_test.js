@@ -4,6 +4,8 @@ require('chai').should()
 const Application = require('../lib/Application')
 const elapsed = require('lucy-util').elapsed
 
+Application.rootpath = __dirname + '/fixtures'
+
 // mock requestAnimationFrame
 if (!global.requestAnimationFrame) {
   global.requestAnimationFrame = function(func) {
