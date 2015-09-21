@@ -7,8 +7,6 @@ require ( 'chai' )
 const Application = require ( '../lib/Application' )
 Application.rootpath = __dirname + '/fixtures'
 
-console.log ( Application.rootpath )
-
 describe
 ( 'app'
 , function ()
