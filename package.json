@@ -25,7 +25,7 @@
   },
   "dependencies": {
     "lucy-dirsum": "^0.1.1",
-    "lucy-live": "^0.1.1",
+    "lucy-live": "^0.1.2",
     "lucy-util": "^0.1.1"
   },
   "homepage": "https://github.com/lucidogen/lucy-app#readme",
