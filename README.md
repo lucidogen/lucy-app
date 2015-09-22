@@ -8,7 +8,7 @@ lucy.app helps loading scenes and runs the animate loop.
 
 Usage example (without live coding):
 
-  ```Javascript
+  ```js
   // Singleton
   const app  = require ( 'lucy-app' )
   const main = require ( './scene/index' )
@@ -20,7 +20,7 @@ Usage example (without live coding):
 
 Usage example (live coding):
 
-  ```Javascript
+  ```js
   // Singleton
   const app  = require ( 'lucy-app' )
   const live = require ( 'lucy-live' )
@@ -35,7 +35,7 @@ Usage example (live coding):
 
 Usage example (live coding, scene composition):
 
-  ```Javascript
+  ```js
   // Singleton
   const app   = require ( 'lucy-app' )
   const comp  = require ( 'lucy-compose' ).load
